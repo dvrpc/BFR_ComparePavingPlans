@@ -20,7 +20,7 @@ def main():
     today = date.today()
     print(today)
 
-    changes = fr"{ev.DATA_ROOT}\from_oracle\db_pull_{today}.csv"
+    changes = fr"{ev.DATA_ROOT}/from_oracle/db_pull_{today}.csv"
 
     # connect to Oracle, declare your query
     db = cx_Oracle.connect(ev.ORACLE_NAME, ev.ORACLE_PW, ev.ORACLE_HOST)
@@ -43,8 +43,8 @@ def main():
     ENGINE.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
 
     # drop existing backup and copy previous oracle export as backup
-    #ENGINE.execute("DROP TABLE IF EXISTS from_oracle_backup; COMMIT;")
-    #ENGINE.execute("SELECT * INTO from_oracle_backup FROM from_oracle; COMMIT;")
+    # ENGINE.execute("DROP TABLE IF EXISTS from_oracle_backup; COMMIT;")
+    # ENGINE.execute("SELECT * INTO from_oracle_backup FROM from_oracle; COMMIT;")
 
     # write dataframe to postgis, replacing old table
     df.to_sql("from_oracle", con=ENGINE, if_exists="replace")

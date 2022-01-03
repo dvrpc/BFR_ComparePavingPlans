@@ -128,6 +128,7 @@ def main():
     counties = ["Bucks", "Chester", "Delaware", "Montgomery", "Philadelphia"]
 
     for county in counties:
+        print(county)
         parse_all_pdfs(county)
 
 
