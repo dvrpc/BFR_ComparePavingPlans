@@ -1,4 +1,4 @@
-name: bfr_plancomparison
+name: bfr_compare_paving_plans
 channels:
   - conda-forge
 dependencies:
