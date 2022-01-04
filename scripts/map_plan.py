@@ -43,7 +43,7 @@ def add_county_code(county):
         "Chester": "15",
         "Delaware": "23",
         "Montgomery": "46",
-        "Philadelphia": "51",
+        "Philadelphia": "67",
     }
     code = county_lookup[county]
 
@@ -149,8 +149,8 @@ def map_phila():
                 a.*,
                 b.seg_no,
                 b.geometry
-            FROM tblB b
-            LEFT OUTER JOIN tblA a
+            FROM tblA a
+            LEFT OUTER JOIN tblB b
             ON a.sr = b.srno
             AND a.co_no = b.co_no)
         SELECT *
@@ -195,10 +195,10 @@ def write_outputs(gdf):
 
 
 def main():
-    # read_in_penndot_rms()
-    # counties = ["Bucks", "Chester", "Delaware", "Montgomery", "Philadelphia"]
-    # for county in counties:
-    #    add_county_code(county)
+    #read_in_penndot_rms()
+    counties = ["Bucks", "Chester", "Delaware", "Montgomery", "Philadelphia"]
+    for county in counties:
+        add_county_code(county)
     write_outputs(combine_counties())
 
 

@@ -27,7 +27,8 @@ def reproject(filelocation):
 
 def main():
 
-    data_dir = Path("./data/geojson")
+    data_dir = Path(fr"{ev.DATA_ROOT}/geojsons")
+    # file = data_dir / "mapped_plan.geojson"
     philly_city_hall = [39.952179401878304, -75.16376402095634]
     output_path = "./maps/5-yearPlan.html"
 
