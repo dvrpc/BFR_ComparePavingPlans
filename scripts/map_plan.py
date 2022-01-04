@@ -15,7 +15,7 @@ from env_vars import ENGINE
 
 
 def read_in_penndot_rms():
-
+    print("Gathering PennDOT data")
     # import PennDOT's rms layer from GIS portal - RMSADMIN (Administrative Classifications of Roadway)
     gdf = gpd.read_file(
         "https://opendata.arcgis.com/datasets/a934887d51e647d295806cc2d9c02097_0.geojson"
@@ -37,6 +37,7 @@ def read_in_penndot_rms():
 
 
 def add_county_code(county):
+    print("Adding county codes")
     county_lookup = {
         "Bucks": "09",
         "Chester": "15",
@@ -46,15 +47,15 @@ def add_county_code(county):
     }
     code = county_lookup[county]
 
-    sql1 = """
-    ALTER TABLE f"{county}_County_Plan"    
-    ADD COLUMN cty_code VARCHAR;
+    sql1 = fr"""
+    ALTER TABLE "{county}_County_Plan"    
+    ADD COLUMN IF NOT EXISTS cty_code VARCHAR;
     COMMIT;
     """
 
-    sql2 = """
-    UPATE f"{county}_County_Plan"
-    SET cty_code = f"{code}";
+    sql2 = fr"""
+    UPDATE "{county}_County_Plan"
+    SET cty_code = {code};
     COMMIT;
     """
     con = ENGINE.connect()
@@ -63,12 +64,13 @@ def add_county_code(county):
 
 
 def map_each_county(county):
+    print(fr"Mapping {county}")
     gdf = gpd.GeoDataFrame.from_postgis(
-        """
+        fr"""
         WITH tblA AS(
         SELECT 
             "Year",
-            to_char(CAST("STATE_ROUTE" AS numeric), 'fm0000') AS sr,
+            to_char(CAST("SR" AS numeric), 'fm0000') AS sr,
             "Road Name",
             "From",
             CAST("SegmentFrom" as numeric) AS sf,
@@ -80,8 +82,8 @@ def map_each_county(county):
             "Municipality2",
             "Municipality3",
             "Miles Planned",
-            ct_code as co_no
-        FROM f"{county}_County_Plan" 
+            CAST(cty_code as numeric) as co_no
+        FROM "{county}_County_Plan" 
         ),
         tblB AS(
             SELECT
@@ -104,7 +106,7 @@ def map_each_county(county):
         FROM tblC 
         WHERE seg_no >= sf
         AND seg_no <= st
-        AND "CALENDAR_YEAR" IS NOT NULL;
+        AND "Year" IS NOT NULL;
     """,
         con=ENGINE,
         geom_col="geometry",
@@ -115,12 +117,13 @@ def map_each_county(county):
 
 def map_phila():
     county = "Philadelphia"
+    print(fr"Mapping {county}")
     gdf = gpd.GeoDataFrame.from_postgis(
-        """
+        fr"""
         WITH tblA AS(
         SELECT 
             "Year",
-            to_char(CAST("STATE_ROUTE" AS numeric), 'fm0000') AS sr,
+            to_char(CAST("SR" AS numeric), 'fm0000') AS sr,
             "Road Name",
             "From",
             CAST("SegmentFrom" as numeric) AS sf,
@@ -130,8 +133,8 @@ def map_phila():
             "OffsetTo",
             "Municipality1",
             "Miles Planned",
-            ct_code as co_no
-        FROM f"{county}_County_Plan" 
+            CAST(cty_code as numeric) as co_no
+        FROM "{county}_County_Plan" 
         ),
         tblB AS(
             SELECT
@@ -154,7 +157,7 @@ def map_phila():
         FROM tblC 
         WHERE seg_no >= sf
         AND seg_no <= st
-        AND "CALENDAR_YEAR" IS NOT NULL;
+        AND "Year" IS NOT NULL;
     """,
         con=ENGINE,
         geom_col="geometry",
@@ -192,10 +195,10 @@ def write_outputs(gdf):
 
 
 def main():
-    read_in_penndot_rms()
-    counties = ["Bucks", "Chester", "Delaware", "Montgomery", "Philadelphia"]
-    for county in counties:
-        add_county_code(county)
+    # read_in_penndot_rms()
+    # counties = ["Bucks", "Chester", "Delaware", "Montgomery", "Philadelphia"]
+    # for county in counties:
+    #    add_county_code(county)
     write_outputs(combine_counties())
 
 

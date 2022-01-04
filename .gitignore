@@ -115,3 +115,5 @@ dmypy.json
 
 /data/from_oracle
 /data/CSVs
+/data/geojsons
+/data/shapefiles
