@@ -34,21 +34,43 @@ def fill_empty_years(df):
     """
     frames = []
     r = df.index[df["SR"] == "Result"]
+    n = df.index[df["SR"].isnull()]
     c = df.index[df["Year"] == "Calendar year"]
 
-    for i in range(0, len(r)):
-        page_start = 0
-        if i == 0:
-            chunk = df.iloc[page_start : r[i]]
-            # starting from after the misplaced heading name
-            year = df.iloc[c[0] + 1]["Year"]
-            chunk["Year"].fillna(year, inplace=True)
-            frames.append(chunk)
-        else:
-            chunk = df.iloc[r[i - 1] + 1 : r[i]]
-            year = df.iloc[r[i - 1] + 1]["Year"]
-            chunk["Year"].fillna(year, inplace=True)
-            frames.append(chunk)
+    if len(r) == 0:
+        if len(n) > 1:
+            # if there is no total result row because they were left null, the nulls will be next to each other
+            # drop the second one from the list
+            if n[-1] - n[-2] == 1:
+                n = n[:-1]
+        r = n
+        for i in range(0, len(r)):
+            page_start = 0
+            if i == 0:
+                chunk = df.iloc[page_start : r[i]]
+                # starting from after the misplaced heading name
+                year = df.iloc[c[0] + 1]["Year"]
+                chunk["Year"].fillna(year, inplace=True)
+                frames.append(chunk)
+            else:
+                chunk = df.iloc[r[i - 1] + 1 : r[i]]
+                year = df.iloc[r[i - 1] + 1]["Year"]
+                chunk["Year"].fillna(year, inplace=True)
+                frames.append(chunk)
+    else:
+        for i in range(0, len(r)):
+            page_start = 0
+            if i == 0:
+                chunk = df.iloc[page_start : r[i]]
+                # starting from after the misplaced heading name
+                year = df.iloc[c[0] + 1]["Year"]
+                chunk["Year"].fillna(year, inplace=True)
+                frames.append(chunk)
+            else:
+                chunk = df.iloc[r[i - 1] + 1 : r[i]]
+                year = df.iloc[r[i - 1] + 1]["Year"]
+                chunk["Year"].fillna(year, inplace=True)
+                frames.append(chunk)
 
     allyears = pd.concat(frames, ignore_index=True)
 
@@ -67,10 +89,14 @@ def parse_single_page(file, page_number):
     table = tabula.read_pdf(file, pages=page_number, pandas_options={"header": None})[0]
     df = pd.DataFrame(table)
 
-    # drop extra columns
-    if str(df[0][0]) == "nan":
-        col_to_drop = [4, 8]
-        df.drop(col_to_drop, axis=1, inplace=True)
+    # drop extra/empty columns (empty except header row)
+    cols_to_drop = []
+    for i in range(0, len(df.columns)):
+        if df[i].isnull()[1:].all():
+            cols_to_drop.append(i)
+
+    if len(cols_to_drop) > 0:
+        df.drop(cols_to_drop, axis=1, inplace=True)
 
     # rename columns
     column_names = [
