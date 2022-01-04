@@ -84,7 +84,7 @@ def drop_total_results_row(df):
     return df
 
 
-def parse_single_page(file, page_number):
+def parse_single_page(county, file, page_number):
 
     table = tabula.read_pdf(file, pages=page_number, pandas_options={"header": None})[0]
     df = pd.DataFrame(table)
@@ -112,9 +112,14 @@ def parse_single_page(file, page_number):
         "Municipality1",
         "Municipality2",
         "Municipality3",
-        "Miles Panned",
+        "Miles Planned",
     ]
-    df.columns = column_names
+    if county == "Philadelphia":
+        phila_columns = column_names[:-3]
+        phila_columns.append(column_names[-1])
+        df.columns = phila_columns
+    else:
+        df.columns = column_names
 
     # fill in empty years
     df = fill_empty_years(df)
@@ -139,7 +144,7 @@ def parse_all_pdfs(county):
     frames = []
     num_pages = get_number_of_pages_in_pdf(file)
     for i in range(1, num_pages + 1):
-        df = parse_single_page(file, page_number=i)
+        df = parse_single_page(county, file, page_number=i)
         frames.append(df)
 
     allpgs = pd.concat(frames, ignore_index=True)
