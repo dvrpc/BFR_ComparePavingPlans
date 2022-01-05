@@ -16,9 +16,9 @@ from env_vars import ENGINE
 
 def read_in_penndot_rms():
     print("Gathering PennDOT data")
-    # import PennDOT's rms layer from GIS portal - RMSADMIN (Administrative Classifications of Roadway)
+    # import PennDOT's rms layer from GIS portal - RMSSEG (State Roads)
     gdf = gpd.read_file(
-        "https://opendata.arcgis.com/datasets/a934887d51e647d295806cc2d9c02097_0.geojson"
+        "https://opendata.arcgis.com/datasets/d9a2a5df74cf4726980e5e276d51fe8d_0.geojson"
     )
 
     # remove null geometries
@@ -89,7 +89,7 @@ def map_each_county(county):
             SELECT
                 "ST_RT_NO" as srno ,
                 CAST("CTY_CODE" AS numeric) as co_no,
-                CAST("SEG_BGN" AS numeric) as seg_no,
+                CAST("SEG_NO" AS numeric) as seg_no,
                 geometry 
             FROM penndot_rms
             ),
@@ -140,7 +140,7 @@ def map_phila():
             SELECT
                 "ST_RT_NO" as srno ,
                 CAST("CTY_CODE" AS numeric) as co_no,
-                CAST("SEG_BGN" AS numeric) as seg_no,
+                CAST("SEG_NO" AS numeric) as seg_no,
                 geometry 
             FROM penndot_rms
             ),
@@ -195,7 +195,7 @@ def write_outputs(gdf):
 
 
 def main():
-    #read_in_penndot_rms()
+    # read_in_penndot_rms()
     counties = ["Bucks", "Chester", "Delaware", "Montgomery", "Philadelphia"]
     for county in counties:
         add_county_code(county)
