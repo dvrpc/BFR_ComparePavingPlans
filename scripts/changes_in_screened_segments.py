@@ -6,9 +6,6 @@ the most recent plan from the oracle database,
 focusing on the already screened segments
 (admin selected and active). 
 
-This collection of functions and loops is designed to 
-be run manually in a notebook for detailed troubelshooting.
-
 """
 
 import pandas as pd
