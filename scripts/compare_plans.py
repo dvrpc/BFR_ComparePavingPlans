@@ -1,18 +1,23 @@
 """
 compare_plans.py
 ------------------
-This script...
+This script comapres the new 5 year plan to
+the most recent plan from the oracle database.
+
+When a new plan is received, update "SOURCE" on line 38
 
 """
-import geopandas as gpd
+
 import pandas as pd
 import env_vars as ev
 from env_vars import ENGINE
 
 
-format_tables_for_join = """
-    with oldplan as(
-        select 
+def read_oracle():
+    # select only records from latest 5 year plan, assuming other changes were resolved
+    from_oracle = pd.read_sql(
+        """
+        SELECT 
             cast("CALENDAR_YEAR" as text) as "CALENDAR_YEAR" ,
             to_char(CAST("STATE_ROUTE" AS numeric), 'fm0000') AS sr,
             "LOC_ROAD_NAME_RMS" ,
@@ -26,165 +31,114 @@ format_tables_for_join = """
             "MUNICIPALITY_NAME2" ,
             "MUNICIPALITY_NAME3" ,
             cast("PLANNED" as text) as "PLANNED" ,
-            "CNT_CODE" ,
-            CONCAT("STATE_ROUTE","SEGMENT_FROM", "SEGMENT_TO") as shortcode, 
-            CONCAT("STATE_ROUTE","SEGMENT_FROM", to_char(cast("OFFSET_FROM" as numeric), 'fm0000'), "SEGMENT_TO", to_char(cast("OFFSET_TO" as numeric), 'fm0000')) as longcode
-        from from_oracle 
-    ), 
-    newplan as (
-        select 
-            *,
-            "Year" as yr,
-            CONCAT("sr","sf", "st") AS shortcode,
-            trim(trailing '.0' from CONCAT("sr",cast("sf" as text), cast("OffsetFrom" as text), cast("st" as text), to_char(cast("OffsetTo" as numeric), 'fm0000'))) as longcode
-        from mapped_plan
+            cast("CNT_CODE" as numeric) as "CNT_CODE",
+            "SHORTCODE" as shortcode, 
+            "LONGCODE" as longcode
+        FROM from_oracle
+        WHERE "SOURCE" = '5-year plan 2020-2024'
+        """,
+        con=ENGINE,
     )
-    """
 
-# find base length of new plan for comparison purposes
-new_plan = pd.read_sql(
-    """
-    SELECT *
-    FROM mapped_plan;
-    """,
-    con=ENGINE,
-)
+    # remove duplicate rows from oracle table
+    from_oracle = from_oracle[~from_oracle.duplicated()]
 
-# these records are the same in the new plan as they are in the database
-nochange = pd.read_sql(
-    fr"""
-    {format_tables_for_join}
-    SELECT 
-        a.*,
-        b.yr as new_year,
-        b."Miles Planned",
-        b.shortcode,
-        b.longcode
-    FROM oldplan a
-    INNER JOIN newplan b
-    ON a.longcode = b.longcode
-    WHERE a."CALENDAR_YEAR" = b.yr
-    AND a."PLANNED" = b."Miles Planned"
-    ORDER BY a."CALENDAR_YEAR", a."CNT_CODE"
-    """,
-    con=ENGINE,
-)
+    return from_oracle
 
-# these records cover the same segments, but have different offsets, thus different planned miles
-length_change = pd.read_sql(
-    fr"""
-    {format_tables_for_join}
-    SELECT 
-        a.*,
-        b.yr as new_year,
-        b."Miles Planned",
-        b.shortcode,
-        b.longcode
-    FROM oldplan a
-    INNER JOIN newplan b
-    ON a.shortcode = b.shortcode
-    WHERE a.longcode <> b.longcode
-    ORDER BY a."CALENDAR_YEAR", a."CNT_CODE"
-    """,
-    con=ENGINE,
-)
 
-# these records have changed years but, the extents are the same
-year_change = pd.read_sql(
-    fr"""
-    {format_tables_for_join}
-    SELECT 
-        a.*,
-        b.yr as new_year,
-        b."Miles Planned",
-        b.shortcode,
-        b.longcode
-    FROM oldplan a
-    INNER JOIN newplan b
-    ON a.longcode = b.longcode
-    WHERE a."CALENDAR_YEAR" <> b.yr
-    ORDER BY a."CALENDAR_YEAR", a."CNT_CODE"
-    """,
-    con=ENGINE,
-)
+def read_plans():
 
-# these records are in the database but are not in the new plan
-removed_from_plan = pd.read_sql(
-    fr"""
-    {format_tables_for_join}
-    SELECT 
-        a.*
-    FROM oldplan a
-    WHERE NOT EXISTS(
+    district_plan = pd.read_sql(
+        """
         SELECT *
-        FROM newplan b
-        WHERE a.shortcode = b.shortcode
-        )
-    AND a."CALENDAR_YEAR" NOT IN ('2018', '2019', '2020', '2021')
-    ORDER BY a."CALENDAR_YEAR", a."CNT_CODE"
-    """,
-    con=ENGINE,
-)
+        FROM "District_Plan";
+        """,
+        con=ENGINE,
+    )
+
+    district_plan = district_plan.drop("level_0", axis=1)
+    district_plan = district_plan.drop("index", axis=1)
+
+    return district_plan
 
 
-new_to_plan = pd.read_sql(
-    fr"""
-    {format_tables_for_join}
-    SELECT 
-        b.*
-    FROM newplan b
-    WHERE NOT EXISTS(
-        SELECT a.*
-        FROM oldplan a
-        WHERE a.shortcode = b.shortcode
-        )
-    ORDER BY b.yr, b.co_no
-    """,
-    con=ENGINE,
-)
+def main():
+    district_plan = read_plans()
+    from_oracle = read_oracle()
 
-minor_length_change = pd.read_sql(
-    fr"""
-    {format_tables_for_join}
-    SELECT 
-        a.*,
-        b.yr as new_year,
-        b."Miles Planned",
-        b.shortcode,
-        b.longcode
-    FROM oldplan a
-    INNER JOIN newplan b
-    ON a.shortcode = b.shortcode
-    WHERE a."CALENDAR_YEAR" = b.yr
-    AND a."PLANNED" = b."Miles Planned"
-    ORDER BY a."CALENDAR_YEAR", a."CNT_CODE"
-    """,
-    con=ENGINE,
-)
+    new_seg_counter = 0
+    no_change_counter = 0
+    year_change_counter = 0
+    length_change_counter = 0
+    new_year_and_length_counter = 0
+
+    new_segments = []
+    length_change = []
+    year_change = []
+    no_change = []
+    for i, row in district_plan.iterrows():
+        county_subset = from_oracle[from_oracle["CNT_CODE"] == int(row["cty_code"])]
+        if len(county_subset) > 0:
+            # if shortcode matches anything in DB
+            if county_subset["shortcode"].str.contains(row["shortcode"]).any():
+                match_row = county_subset.loc[
+                    county_subset["shortcode"] == row["shortcode"]
+                ]
+                if match_row["longcode"].item() == row["longcode"]:
+                    if match_row["CALENDAR_YEAR"].item() == row["Year"]:
+                        no_change_counter += 1
+                        no_change.append(row)
+                    else:
+                        year_change_counter += 1
+                        year_change.append(row)
+                else:
+                    if match_row["CALENDAR_YEAR"].item() == row["Year"]:
+                        length_change_counter += 1
+                        length_change.append(row)
+                    else:
+                        new_year_and_length_counter += 1
+                        year_change_counter += 1
+                        year_change.append(row)
+                        length_change_counter += 1
+                        length_change.append(row)
+            else:
+                new_seg_counter += 1
+                new_segments.append(row)
+        else:
+            new_seg_counter += 1
+            new_segments.append(row)
+
+    # convert lists to data frames
+    # update for everything: source, shortcode, longcode
+    new_segments = pd.DataFrame(new_segments)  # append to DB
+    length_change = pd.DataFrame(length_change)  # update offset fields
+    year_change = pd.DataFrame(year_change)  # change year
+    no_change = pd.DataFrame(no_change)
+
+    # add source column to each DF
+    new_segments["SOURCE"] = "5-year plan 2022-2026"
+    length_change["SOURCE"] = "5-year plan 2022-2026"
+    year_change["SOURCE"] = "5-year plan 2022-2026"
+    no_change["SOURCE"] = "5-year plan 2022-2026"
+
+    # write to csv
+    new_segments.to_csv(
+        "D:/dvrpc_shared/BFR_ComparePavingPlans/data/to_change/new_segments.csv",
+        index=False,
+    )
+    length_change.to_csv(
+        "D:/dvrpc_shared/BFR_ComparePavingPlans/data/to_change/length_change.csv",
+        index=False,
+    )
+    year_change.to_csv(
+        "D:/dvrpc_shared/BFR_ComparePavingPlans/data/to_change/year_change.csv",
+        index=False,
+    )
+    no_change.to_csv(
+        "D:/dvrpc_shared/BFR_ComparePavingPlans/data/to_change/no_change.csv",
+        index=False,
+    )
 
 
-print("Records in new plan: ", len(new_plan))
-print("No change: ", len(nochange))
-print("Length change: ", len(length_change))
-print("Year change: ", len(year_change))
-print("Removed from plan: ", len(removed_from_plan))
-print("New to plan: ", len(new_to_plan))
-print("Minor length change: ", len(minor_length_change))
-
-# now that these are all in here, cut phila via dataframe and see what needs to be done with each
-
-new_plan_by_year = new_plan.groupby(["Year", "co_no"])["Year"].count()
-new_record_by_year = new_to_plan.groupby(["yr", "co_no"])["yr"].count()
-to_blend = [new_plan_by_year, new_record_by_year]
-compare_years = pd.concat(to_blend, ignore_index=True, axis=1)
-print(compare_years)
-
-
-l = [
-    len(nochange),
-    len(length_change),
-    len(year_change),
-    len(new_to_plan),
-    len(minor_length_change),
-]
-# print(sum(l))
+if __name__ == "__main__":
+    main()

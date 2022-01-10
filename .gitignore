@@ -117,3 +117,4 @@ dmypy.json
 /data/CSVs
 /data/geojsons
 /data/shapefiles
+/notebooks
