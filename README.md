@@ -12,9 +12,11 @@ Compare 5-year resurfacing plans and track changes
 
 ### Compare new plan to database records
 Assuming `import_oracle.py` and `scrape_tables.py` are run:
+
 3. Modify tables for easy comparison using `prepare_tables_for_comparison.py`
 4. Output lists of records and their changes to send for Oracle database update using `compare_plans.py`
 
 ### Identify changes in segments that have already been screened
 Will require manual updates to reflect new plan years and years that have been screened.
+
 4. Identify changes status of screened segments using `changes_in_screened_segments.py`
