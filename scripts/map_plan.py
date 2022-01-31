@@ -181,7 +181,24 @@ def combine_counties():
     return mapped_plan
 
 
-def write_outputs(gdf):
+def write_postgis(gdf):
+    # output spatial file (postgis, shp, and geojson)
+    gdf.to_postgis("mapped_plan", con=ENGINE, if_exists="replace")
+    print("To database: Complete")
+
+def concat_munis():
+    gdf = gpd.GeoDataFrame.from_postgis(
+        fr"""
+        SELECT *,
+        ("Municipality1"|| coalesce (', ' || "Municipality2", '') || coalesce (', ' || "Municipality3", '')) as muni
+        FROM mapped_plan
+        """,
+        con=ENGINE,
+        geom_col="geometry")
+
+    return(gdf)
+
+def write_all_outputs(gdf):
     # output spatial file (postgis, shp, and geojson)
     gdf.to_postgis("mapped_plan", con=ENGINE, if_exists="replace")
     print("To database: Complete")
@@ -193,13 +210,13 @@ def write_outputs(gdf):
     )
     print("To GeoJSON: Complete")
 
-
 def main():
-    # read_in_penndot_rms()
+    read_in_penndot_rms()
     counties = ["Bucks", "Chester", "Delaware", "Montgomery", "Philadelphia"]
     for county in counties:
         add_county_code(county)
-    write_outputs(combine_counties())
+    write_postgis(combine_counties())
+    write_all_outputs(concat_munis())
 
 
 if __name__ == "__main__":
