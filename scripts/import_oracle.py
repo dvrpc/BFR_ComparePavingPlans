@@ -2,53 +2,73 @@
 import_oracle.py
 ------------------
 This script pulls the latest SEPA datatable from the Oracle database.
-A CSV copy of the Oracle export is saved in the /data/from_oracle with the run date.
-It created a backup of the existing Oracle copy in a postgres database.
-Then it inserts the latest copy under the same name.
+It pipes the outputs into a postgres database. 
 """
 
-import cx_Oracle
-import csv
-from datetime import date
-import pandas as pd
-from sqlalchemy_utils import database_exists, create_database
+import oracledb
+import psycopg2
+from sys import platform
 import env_vars as ev
-from env_vars import ENGINE
 
 
-def main():
-    today = date.today()
-    print(today)
+def test_platform():
+    if platform == "linux" or platform == "linux2":
+        tns_path = ev.LINUX_TNS
+    elif platform == "win32":
+        tns_path = ev.WINDOWS_TNS
+    elif platform == "darwin":
+        raise Exception("Darwin machine, unknown TNS file location")
 
-    changes = fr"{ev.DATA_ROOT}/from_oracle/db_pull_{today}.csv"
+    oracledb.defaults.config_dir = tns_path
+    print(f"platform is {platform}, tns path is {tns_path}")
+    return oracledb.defaults.config_dir
 
-    # connect to Oracle, declare your query
-    db = cx_Oracle.connect(ev.ORACLE_NAME, ev.ORACLE_PW, ev.ORACLE_HOST)
-    cursor = db.cursor()
-    SQL = r"SELECT * FROM SEPADATA"
 
-    ##run cursor on db, write to csv
-    cursor.execute(SQL)
-    with open(changes, "w", encoding="utf-8") as fout:
-        writer = csv.writer(fout)
-        writer.writerow([i[0] for i in cursor.description])  ##heading row
-        writer.writerows(cursor.fetchall())
+def create_cxs():
+    """Create connections to Oracle and Postgres dbs"""
+    try:
+        oracle_cx = oracledb.connect(user=ev.ORA_UN, password=ev.ORA_PW, dsn=ev.DNS)
+        print("Successfully connected to the Oracle database")
+        pg_cx = psycopg2.connect(ev.POSTGRES_URL)
+        print("Successfully connected to the Postgres database")
+    except (oracledb.Error, psycopg2.OperationalError) as e:
+        print(f"Error: {e}")
 
-    df = pd.read_csv(changes)
+    return oracle_cx, pg_cx
 
-    # create database
-    if not database_exists(ENGINE.url):
-        create_database(ENGINE.url)
 
-    ENGINE.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
+def get_pg_create_table_query(table_name, columns):
+    """Generates a PostgreSQL CREATE TABLE query with dynamic columns."""
+    columns_with_types = ", ".join([f"{col} text" for col in columns])
+    return f"CREATE TABLE IF NOT EXISTS {table_name} ({columns_with_types});"
 
-    # drop existing backup and copy previous oracle export as backup
-    # ENGINE.execute("DROP TABLE IF EXISTS from_oracle_backup; COMMIT;")
-    # ENGINE.execute("SELECT * INTO from_oracle_backup FROM from_oracle; COMMIT;")
 
-    # write dataframe to postgis, replacing old table
-    df.to_sql("from_oracle", con=ENGINE, if_exists="replace")
+def pipe_data(oracle_cx: oracledb.Connection, pg_cx: psycopg2.extensions.connection):
+    """Pipes Oracle data into PostgreSQL db."""
+    orcl_cursor = oracle_cx.cursor()
+    pg_cursor = pg_cx.cursor()
+
+    orcl_cursor.execute("SELECT * FROM SEPADATA WHERE ROWNUM = 1")
+    columns = [desc[0] for desc in orcl_cursor.description]
+
+    create_table_query = get_pg_create_table_query("public.oracle_copy", columns)
+    pg_cursor.execute(create_table_query)
+
+    orcl_cursor.execute("SELECT * FROM SEPADATA")
+    oracle_data = orcl_cursor.fetchall()
+    placeholders = ", ".join(["%s"] * len(columns))
+    insert_query = f"INSERT INTO public.oracle_copy VALUES ({placeholders})"
+    for row in oracle_data:
+        pg_cursor.execute(insert_query, row)
+
+    pg_cx.commit()
+    orcl_cursor.close()
+    pg_cursor.close()
 
 
 if __name__ == "__main__":
-    main()
+    tns = test_platform()
+    oracle_cx, pg_cx = create_cxs()
+    pipe_data(oracle_cx, pg_cx)
+    pg_cx.close()
+    oracle_cx.close()

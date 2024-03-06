@@ -1,13 +1,16 @@
-import os
-from pathlib import Path
-from dotenv import find_dotenv, load_dotenv
+from dotenv import dotenv_values
 from sqlalchemy import create_engine
 
-load_dotenv(find_dotenv())
+config = dotenv_values("../.env")
 
-POSTGRES_URL = os.getenv("postgres_url")
-ORACLE_NAME = os.getenv("oracle_name")
-ORACLE_PW = os.getenv("oracle_pw")
-ORACLE_HOST = os.getenv("oracle_host")
+# DATA_ROOT = os.getenv("data_root")
+
+# postgresql
+POSTGRES_URL = config["PG_URL"]
 ENGINE = create_engine(POSTGRES_URL)
-DATA_ROOT = os.getenv("data_root")
+# oracle
+ORA_UN = config["ORA_UN"]
+ORA_PW = config["ORA_PW"]
+LINUX_TNS = config["LINUX_TNS"]
+WINDOWS_TNS = config["WINDOWS_TNS"]
+DNS = config["DNS"]
