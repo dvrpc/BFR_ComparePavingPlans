@@ -29,10 +29,17 @@ def create_cxs():
     try:
         oracle_cx = oracledb.connect(user=ev.ORA_UN, password=ev.ORA_PW, dsn=ev.DNS)
         print("Successfully connected to the Oracle database")
+    except oracledb.Error as e:
+        print(f"Error connecting to the Oracle database: {e}")
+
+    try:
         pg_cx = psycopg2.connect(ev.POSTGRES_URL)
         print("Successfully connected to the Postgres database")
-    except (oracledb.Error, psycopg2.OperationalError) as e:
-        print(f"Error: {e}")
+    except psycopg2.OperationalError as e:
+        print(f"Error connecting to the Postgres database: {e}")
+
+    if oracle_cx is None or pg_cx is None:
+        raise Exception("Failed to create one or more database connections.")
 
     return oracle_cx, pg_cx
 
