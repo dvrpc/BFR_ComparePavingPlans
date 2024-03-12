@@ -50,7 +50,10 @@ def convert_pg_types_to_oracle(oracle_type):
         "<DbType DB_TYPE_VARCHAR>": "VARCHAR",
         "<DbType DB_TYPE_DATE>": "DATE",
     }
-    return oracle2pg[str(oracle_type)]
+    try:
+        return oracle2pg[str(oracle_type)]
+    except KeyError:
+        raise Exception("Unmapped Oracle Type. Add type to oracle2pg dict.")
 
 
 def get_pg_create_table_query(table_name, columns_and_types: dict):
