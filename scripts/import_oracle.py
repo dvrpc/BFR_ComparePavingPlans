@@ -64,11 +64,11 @@ def pipe_data(oracle_cx: oracledb.Connection, pg_cx: psycopg2.extensions.connect
     pg_cx.commit()
     orcl_cursor.close()
     pg_cursor.close()
+    pg_cx.close()
+    oracle_cx.close()
 
 
 if __name__ == "__main__":
     tns = test_platform()
     oracle_cx, pg_cx = create_cxs()
     pipe_data(oracle_cx, pg_cx)
-    pg_cx.close()
-    oracle_cx.close()
