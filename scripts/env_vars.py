@@ -1,8 +1,7 @@
 from dotenv import dotenv_values
 from sqlalchemy import create_engine
 
-config = dotenv_values("../.env")
-
+config = dotenv_values(".env")
 # DATA_ROOT = os.getenv("data_root")
 
 # postgresql
