@@ -120,3 +120,4 @@ dmypy.json
 /data/geojsons
 /data/shapefiles
 /notebooks
+/data/text
