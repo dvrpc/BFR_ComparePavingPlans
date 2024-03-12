@@ -44,9 +44,24 @@ def create_cxs():
     return oracle_cx, pg_cx
 
 
-def get_pg_create_table_query(table_name, columns):
+def convert_pg_types_to_oracle(oracle_type):
+    oracle2pg = {
+        "<DbType DB_TYPE_NUMBER>": "NUMERIC",
+        "<DbType DB_TYPE_VARCHAR>": "VARCHAR",
+        "<DbType DB_TYPE_DATE>": "DATE",
+    }
+    return oracle2pg[str(oracle_type)]
+
+
+def get_pg_create_table_query(table_name, columns_and_types: dict):
     """Generates a PostgreSQL CREATE TABLE query with dynamic columns."""
-    columns_with_types = ", ".join([f"{col} text" for col in columns])
+    columns_with_types = ", ".join(
+        [
+            f"{col} {convert_pg_types_to_oracle(oracle_type)}"
+            for (col, oracle_type) in columns_and_types.items()
+        ]
+    )
+
     return f"CREATE TABLE IF NOT EXISTS {table_name} ({columns_with_types});"
 
 
@@ -54,16 +69,21 @@ def pipe_data(oracle_cx: oracledb.Connection, pg_cx: psycopg2.extensions.connect
     """Pipes Oracle data into PostgreSQL db."""
     orcl_cursor = oracle_cx.cursor()
     pg_cursor = pg_cx.cursor()
+    pg_cursor.execute("DROP TABLE IF EXISTS public.oracle_copy")
 
     orcl_cursor.execute("SELECT * FROM SEPADATA WHERE ROWNUM = 1")
-    columns = [desc[0] for desc in orcl_cursor.description]
+    columns_and_types = {}
+    for value in orcl_cursor.description:
+        columns_and_types[value[0]] = value[1]  # grabs column and oracle data type
 
-    create_table_query = get_pg_create_table_query("public.oracle_copy", columns)
+    create_table_query = get_pg_create_table_query(
+        "public.oracle_copy", columns_and_types
+    )
     pg_cursor.execute(create_table_query)
 
     orcl_cursor.execute("SELECT * FROM SEPADATA")
     oracle_data = orcl_cursor.fetchall()
-    placeholders = ", ".join(["%s"] * len(columns))
+    placeholders = ", ".join(["%s"] * len(columns_and_types))
     insert_query = f"INSERT INTO public.oracle_copy VALUES ({placeholders})"
     for row in oracle_data:
         pg_cursor.execute(insert_query, row)
@@ -73,6 +93,7 @@ def pipe_data(oracle_cx: oracledb.Connection, pg_cx: psycopg2.extensions.connect
     pg_cursor.close()
     pg_cx.close()
     oracle_cx.close()
+    print("successfully imported oracle into postgres!")
 
 
 if __name__ == "__main__":

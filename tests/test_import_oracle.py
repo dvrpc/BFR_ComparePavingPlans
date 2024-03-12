@@ -37,3 +37,25 @@ def test_create_cxs_failure(mock_oracle_connect, mock_pg_connect):
         oracle_cx, pg_cx = import_oracle.create_cxs()
 
     assert "Failed to connect to Oracle DB" in str(excinfo.value)
+
+
+def test_get_pg_create_table_query_multicolumn():
+    table_name = "test"
+    columns = ["id", "length", "geom"]
+
+    expected_query = (
+        "CREATE TABLE IF NOT EXISTS test (id text, length text, geom text);"
+    )
+    actual_query = import_oracle.get_pg_create_table_query(table_name, columns)
+    assert expected_query == actual_query
+
+
+# def test_get_pg_create_table_query_multicolumn():
+#     table_name = "test"
+#     columns = ["id", "length", "geom"]
+
+#     expected_query = (
+#         "CREATE TABLE IF NOT EXISTS test (id text, length text, geom text);"
+#     )
+#     actual_query = import_oracle.get_pg_create_table_query(table_name, columns)
+#     assert expected_query == actual_query
