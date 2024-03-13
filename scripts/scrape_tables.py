@@ -49,6 +49,8 @@ def process_file(file):
                 row[0] = a
                 year = a
             rows.append(row)
+            handle_municipalities(row)
+
     return rows
 
 
@@ -89,6 +91,28 @@ def current_year(r: list):
         return "need year"
     else:
         return r[0]
+
+
+def handle_municipalities(row: list):
+    """Fills in blank strings to ensure all rows are same length"""
+
+    # Insert blanks for philly or places w/ only one/two munis
+    if row[-2] == "PHILADELPHIA":
+        row.insert(-1, "")
+        row.insert(-1, "")
+    # Rows where two munis are filled in
+    elif len(row) == 12:
+        row.insert(-1, "")
+    # Rows where one muni is filled in
+    elif len(row) == 11:
+        row.insert(-1, "")
+        row.insert(-1, "")
+    # Rows with all three munis (do nothing)
+    elif len(row) == 13:
+        pass
+    else:
+        print(row, len(row))
+        raise Exception("Unhandled row length")
 
 
 def main():
