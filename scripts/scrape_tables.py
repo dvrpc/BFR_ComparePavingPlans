@@ -8,10 +8,9 @@ using pdftotext (which is a linux module)
 """
 import subprocess
 import os
-from pathlib import Path
 import re
-import env_vars as ev
 from env_vars import ENGINE
+from sqlalchemy import text
 
 
 def create_txt(filename: str, filepath: str) -> str:
@@ -24,19 +23,52 @@ def create_txt(filename: str, filepath: str) -> str:
         shell=True,
         check=True,
     )
+    clean_textfile(f)
     return f + ".txt"
 
 
+def clean_textfile(filename: str):
+    """Strip problematic chars out of textfile"""
+    directory = "data/text"
+    with open(directory + "/" + filename + ".txt", "r") as file:
+        content = file.read()
+    replaced = content.replace("'", "feet")
+    with open(directory + "/" + filename + ".txt", "w") as file:
+        file.write(replaced)
+
+
 def pipe_to_postgres(filename: str):
+    """Open file, run cleanup and insert functions"""
     directory = "data/text"
     with open(directory + "/" + filename, "r") as file:
-        tables = process_file(file)
-        print(
-            tables
-        )  # a list of lists, with each item represeting one municipality's table
+        print(f"importing {filename} to postgres...")
+        table = process_file(file, filename)
+        handle_insertions(table, filename)
 
 
-def process_file(file):
+def handle_insertions(table: list, filename: str):
+    """Ingests a table representing one municipality and inserts into postgres"""
+    name = filename.split(".")[0].replace("-", " to ")
+    engine = ENGINE
+    with engine.connect() as connection:
+        for row in table:
+            row = tuple(row)
+
+            sql = text(f'INSERT INTO "{name}" VALUES {row};')
+
+            try:
+                connection.execute(sql)
+            except Exception as e:
+                print(f"Error inserting row: {row} - {e}")
+                connection.rollback()
+            connection.commit()
+
+
+def process_file(file, filename):
+    """Create PG table for file and turn rows in textfile to lists"""
+    # remove .txt extension and dash
+    pg_name = filename.split(".")[0].replace("-", " to ")
+    create_pg_table(pg_name)
     rows = []
     year = 0
     for line in file:
@@ -58,6 +90,8 @@ def split_line(line: str) -> list:
     """
     Splits the line on places with 3 or more whitespace chars,
     returns a list representing one row
+
+    Returns none for unneeded rows
     """
     pattern = r"\s{3,}"
     r = re.split(pattern, line.strip())
@@ -82,8 +116,7 @@ def split_line(line: str) -> list:
 
 def current_year(r: list):
     """
-    Logic for reinserting blank/missing values
-    since files are not csv or tab deliminated
+    If list is blank, function indicates a year is needed, otherwise returns the year
     """
     if r is None:
         pass
@@ -115,6 +148,35 @@ def handle_municipalities(row: list):
         raise Exception("Unhandled row length")
 
 
+def create_pg_table(tablename):
+    """Creates Postgres table with columns"""
+    engine = ENGINE
+    with engine.connect() as connection:
+        connection.execute(
+            text(
+                f"""
+            drop table if exists public."{tablename}";
+            create table public."{tablename}"(
+            "Calendar year" char(4),
+            "State Route" varchar,
+            "Loc Road Name RMS" varchar,
+            "Intersection From" varchar,
+            "Segment From" varchar,
+            "Offset From" varchar,
+            "Intersection To" varchar,
+            "Segment To" varchar,
+            "Offset to" varchar,
+            "Municipality Name1" varchar,
+            "Municipality Name2" varchar,
+            "Municipality Name3" varchar,
+            "Miles Planned" numeric);
+
+        """
+            )
+        )
+        connection.commit()
+
+
 def main():
     directory = "data/PDFs"
     for filename in os.listdir(directory):
@@ -126,12 +188,6 @@ def main():
         else:
             filepath = f"data/PDFs/{filename}"
             pipe_to_postgres(create_txt(filename, filepath))
-
-    # counties = ["Bucks", "Chester", "Delaware", "Montgomery", "Philadelphia"]
-
-    # for county in counties:
-    #     print(county)
-    #     parse_all_pdfs(county)
 
 
 if __name__ == "__main__":
