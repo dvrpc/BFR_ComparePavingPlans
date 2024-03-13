@@ -37,24 +37,26 @@ def clean_textfile(filename: str):
         file.write(replaced)
 
 
-def pipe_to_postgres(filename: str):
+def pipe_to_postgres(filename: str, pg_tablename: str):
     """Open file, run cleanup and insert functions"""
     directory = "data/text"
     with open(directory + "/" + filename, "r") as file:
         print(f"importing {filename} to postgres...")
         table = process_file(file, filename)
-        handle_insertions(table, filename)
+        handle_insertions(table, filename, pg_tablename)
 
 
-def handle_insertions(table: list, filename: str):
+def handle_insertions(table: list, filename: str, pg_tablename: str):
     """Ingests a table representing one municipality and inserts into postgres"""
     name = filename.split(".")[0].replace("-", " to ")
+    county = name.split()[0]
     engine = ENGINE
     with engine.connect() as connection:
         for row in table:
+            row.append(county)
             row = tuple(row)
 
-            sql = text(f'INSERT INTO "{name}" VALUES {row};')
+            sql = text(f'INSERT INTO "{pg_tablename}" VALUES {row};')
 
             try:
                 connection.execute(sql)
@@ -67,8 +69,6 @@ def handle_insertions(table: list, filename: str):
 def process_file(file, filename):
     """Create PG table for file and turn rows in textfile to lists"""
     # remove .txt extension and dash
-    pg_name = filename.split(".")[0].replace("-", " to ")
-    create_pg_table(pg_name)
     rows = []
     year = 0
     for line in file:
@@ -169,7 +169,8 @@ def create_pg_table(tablename):
             "Municipality Name1" varchar,
             "Municipality Name2" varchar,
             "Municipality Name3" varchar,
-            "Miles Planned" numeric);
+            "Miles Planned" numeric,
+            "County" varchar);
 
         """
             )
@@ -179,6 +180,8 @@ def create_pg_table(tablename):
 
 def main():
     directory = "data/PDFs"
+    pg_tablename = "DistrictPlan"
+    create_pg_table(pg_tablename)
     for filename in os.listdir(directory):
         file_and_ext = filename.split(".")
         if len(file_and_ext) > 2:
@@ -187,7 +190,7 @@ def main():
             )
         else:
             filepath = f"data/PDFs/{filename}"
-            pipe_to_postgres(create_txt(filename, filepath))
+            pipe_to_postgres(create_txt(filename, filepath), pg_tablename)
 
 
 if __name__ == "__main__":
