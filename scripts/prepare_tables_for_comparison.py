@@ -11,37 +11,6 @@ import env_vars as ev
 from env_vars import ENGINE
 
 
-def combine_plans_full_district():
-    counties = ["Bucks", "Chester", "Delaware", "Montgomery"]
-
-    frames = []
-    for county in counties:
-        df = pd.read_sql(
-            fr"""
-            SELECT *
-            FROM "{county}_County_Plan";
-        """,
-            con=ENGINE,
-        )
-        frames.append(df)
-        # print(fr"Collected {county}")
-
-    suburban_counties = pd.concat(frames, ignore_index=True)
-
-    phila_county = pd.read_sql(
-        """
-    SELECT *
-    FROM "Philadelphia_County_Plan";
-    """,
-        con=ENGINE,
-    )
-
-    to_combine = [suburban_counties, phila_county]
-    all_counties = pd.concat(to_combine, ignore_index=True)
-
-    all_counties.to_sql("District_Plan", ENGINE, if_exists="replace")
-
-
 def add_codes_to_district_plan():
     add_codes_fields = """
     ALTER TABLE "District_Plan"
