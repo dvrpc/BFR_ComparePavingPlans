@@ -4,10 +4,17 @@ import os
 
 last_plan = "5-year plan 2022-2026"
 current_plan = "5-year plan 2024-2028"
+views = [
+    "new_segments",
+    "no_change",
+    "year_change",
+    "length_change",
+    "year_length_change",
+]
 
 VIEWS = f"""
 -- new segments
-create or replace view newsegments as
+create or replace view {views[0]} as
 select a.gisid, b.*, '{current_plan}' as source  from oracle_copy a
 right join "DistrictPlan" b
 on a.shortcode = b.shortcode 
@@ -15,7 +22,7 @@ where gisid is null;
 
 
 --No Change: If both shortcode and longcode match, and CALENDAR_YEAR is the same.
-create or replace view nochange as
+create or replace view {views[1]} as
 select a.gisid, b.*, '{current_plan}' as source from oracle_copy a
 inner join "DistrictPlan" b
 on a.shortcode = b.shortcode
@@ -25,7 +32,7 @@ and a.longcode = b.longcode
 and a.calendar_year = b."Calendar year"::numeric;
 
 --Year Change Only: If shortcode and longcode match, but CALENDAR_YEAR differs.
-create or replace view diff_year as
+create or replace view {views[2]} as
 select a.gisid, b.*, '{current_plan}' as source  from oracle_copy a
 inner join "DistrictPlan" b
 on a.shortcode = b.shortcode
@@ -35,7 +42,7 @@ and a.longcode = b.longcode
 and a.calendar_year != b."Calendar year"::numeric;
 
 --Length Change Only: If shortcode matches, longcode differs, but CALENDAR_YEAR is the same.
-create or replace view diff_geom_same_year as
+create or replace view {views[3]} as
 select a.gisid, b.*, '{current_plan}' as source  from oracle_copy a
 inner join "DistrictPlan" b
 on a.shortcode = b.shortcode
@@ -46,7 +53,7 @@ and a.calendar_year = b."Calendar year"::numeric;
 
 
 --New Year and Length: If shortcode matches, but both longcode and CALENDAR_YEAR differ.
-create or replace view diff_geom_diff_year as
+create or replace view {views[4]} as
 select a.gisid, b.*, '{current_plan}' as source  from oracle_copy a
 inner join "DistrictPlan" b
 on a.shortcode = b.shortcode
@@ -79,14 +86,6 @@ def create_csvs():
     because postgres user (or whatever user in your .env)
     needs write access to dump out these csvs.
     """
-
-    views = [
-        "diff_geom_diff_year",
-        "diff_geom_same_year",
-        "diff_year",
-        "newsegments",
-        "nochange",
-    ]
 
     directory = os.getcwd() + "/data/to_change"
     print(os.getcwd())
