@@ -1,67 +1,78 @@
-"""
-prepare_tables_for_comparison.py
-------------------
-This script modifies and updates tables in 
-the postgres database so they are ready to be
-compared in 'compare_plans.py'.
-
-"""
 from env_vars import ENGINE
 from sqlalchemy import text
 
-
-def add_codes_to_district_plan():
-    add_codes_fields = """
+EDIT_PG_COLUMN_TYPE = """
     ALTER TABLE "DistrictPlan"
     ADD COLUMN IF NOT EXISTS longcode VARCHAR;
 
     ALTER TABLE "DistrictPlan"
     ADD COLUMN IF NOT EXISTS shortcode VARCHAR;
+"""
 
-    COMMIT;
-    """
-
-    populate_codes = """
+UPDATE_PG_CODES = """
+    
     UPDATE "DistrictPlan"
-    SET shortcode = CONCAT("State Route","Segment From", to_char(CAST("Segment To" AS numeric), 'fm0000'));
+    SET shortcode = CONCAT(
+        tochar(cast("State Route" AS numeric),'fm0000')
+        tochar(cast("Segment From" AS numeric), 'fm0000')
+        to_char(CAST("Segment To" AS numeric), 'fm0000')
+    );
 
 
     UPDATE "DistrictPlan"
-    SET longcode = CONCAT("State Route","Segment From", "Offset From", to_char(CAST("Segment To" AS numeric), 'fm0000'), to_char(CAST("Offset to" AS numeric), 'fm0000'));
+    SET longcode = CONCAT(
+        tochar(cast("State Route" AS numeric),'fm0000')
+        tochar(cast("Segment From" AS numeric), 'fm0000')
+        "tochar(cast(Offset From" AS numeric, 'fm0000')
+        to_char(CAST("Segment To" AS numeric), 'fm0000') 
+        to_char(CAST("Offset to" AS numeric), 'fm0000')
+    );
+"""
 
+# Constants for SQL queries
+EDIT_ORACLE_COLUMN_TYPE = """
+    ALTER TABLE oracle_copy
+    ALTER COLUMN "shortcode" TYPE VARCHAR;
+"""
+
+UPDATE_ORACLE_CODES = """
+    UPDATE oracle_copy
+    SET "shortcode" = CONCAT(
+        TO_CHAR(CAST("state_route" AS NUMERIC), 'fm0000'),
+        TO_CHAR(CAST("segment_from" AS NUMERIC), 'fm0000'),
+        TO_CHAR(CAST("segment_to" AS NUMERIC), 'fm0000')
+    );
+    UPDATE oracle_copy
+    SET "longcode" = CONCAT(
+        TO_CHAR(CAST("state_route" AS NUMERIC), 'fm0000'),
+        TO_CHAR(CAST("segment_from" AS NUMERIC), 'fm0000'),
+        TO_CHAR(CAST("offset_from" AS NUMERIC), 'fm0000'),
+        TO_CHAR(CAST("segment_to" AS NUMERIC), 'fm0000'),
+        TO_CHAR(CAST("offset_to" AS NUMERIC), 'fm0000')
+    );
     COMMIT;
-    """
-    con = ENGINE.connect()
-    con.execute(text(add_codes_fields))
-    con.execute(text(populate_codes))
-
+"""
+def edit_pg_codes():
 
 def edit_oracle_codes():
-    edit_oracle_column_type = """
-    alter table oracle_copy 
-    alter column "shortcode" type varchar;
     """
-
-    update_oracle_codes = """
-    update oracle_copy 
-    set "shortcode" = CONCAT(to_char(CAST("state_route" AS numeric), 'fm0000'), to_char(cast("segment_from" as numeric), 'fm0000'), to_char(cast("segment_to" as numeric), 'fm0000'))
-    ;
-
-    update oracle_copy
-    set "longcode" = CONCAT(to_char(CAST("state_route" AS numeric), 'fm0000'), to_char(cast("segment_from" as numeric), 'fm0000'), to_char(cast("offset_from" as numeric), 'fm0000'), to_char(cast("segment_to" as numeric), 'fm0000'), to_char(cast("offset_to" as numeric), 'fm0000'))
-    ;
-
-    COMMIT;
+    Edits and updates Oracle codes in the database.
     """
-    con = ENGINE.connect()
-    con.execute(text(edit_oracle_column_type))
-    con.execute(text(update_oracle_codes))
+    try:
+        con = ENGINE.connect()
+        con.execute(text(EDIT_ORACLE_COLUMN_TYPE))
+        con.execute(text(UPDATE_ORACLE_CODES))
+    except Exception as e:
+        # Handle any exceptions that occur
+        print(f"An error occurred: {e}")
+    finally:
+        # Ensure that the connection is closed
+        con.close()
 
 
 def main():
-    add_codes_to_district_plan()
+    """
+    Main function to run the desired processes.
+    """
     edit_oracle_codes()
-
-
-if __name__ == "__main__":
-    main()
+    # Consider adding other function calls or logic here

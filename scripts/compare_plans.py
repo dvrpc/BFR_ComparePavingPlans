@@ -35,7 +35,7 @@ def read_oracle():
             "SHORTCODE" as shortcode, 
             "LONGCODE" as longcode
         FROM from_oracle
-        WHERE "SOURCE" = '5-year plan 2020-2024'
+        WHERE "SOURCE" = '5-year plan 2022-2026'
         """,
         con=ENGINE,
     )
@@ -47,7 +47,6 @@ def read_oracle():
 
 
 def read_plans():
-
     district_plan = pd.read_sql(
         """
         SELECT *

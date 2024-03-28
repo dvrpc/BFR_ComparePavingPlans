@@ -110,15 +110,13 @@ def process_file(file, filename: str, flag: str):
                 else:
                     row[1] = a
                     year = a
-                if flag == "pdf":
-                    handle_municipalities(row, flag)
-                else:
+                if flag == "xlsx":
                     row.pop(0)  # remove empty first col, 'a' in excel
                     row = row[
                         :19
                     ]  # remove any cols beyond the last, as there are some empties
-                    handle_municipalities(row, flag)
-                if row[0] == 0:
+                handle_municipalities(row, flag)
+                if row[0] == 0 or row[1] == "":
                     pass
                 else:
                     rows.append(row)
@@ -163,7 +161,7 @@ def split_line(line: str, flag: str) -> list:
         return None
     elif r[0][0:4] == "Page":
         return None
-    if len(r) < 5:
+    elif len(r) < 5:
         return None
     else:
         return r
