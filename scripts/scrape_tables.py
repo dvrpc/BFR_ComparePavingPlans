@@ -40,7 +40,7 @@ def create_txt(file_and_ext: list, filepath: str) -> str:
         sheet = workbook[sheet_name]
 
         with open(outpath, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
+            writer = csv.writer(f, delimiter="|")
             for row in sheet.iter_rows(values_only=True):
                 writer.writerow([cell if cell is not None else "" for cell in row])
         flag = "xlsx"
@@ -52,11 +52,11 @@ def create_txt(file_and_ext: list, filepath: str) -> str:
 
 
 def clean_textfile(filename: str):
-    """Strip problematic chars out of textfile (only necessary for pdf scrapes)"""
+    """Strip problematic chars out of textfile"""
     directory = "data/text"
     with open(directory + "/" + filename + ".txt", "r") as file:
         content = file.read()
-    replaced = content.replace("'", "feet")
+    replaced = content.replace("'", "").replace('"', "")
     with open(directory + "/" + filename + ".txt", "w") as file:
         file.write(replaced)
 
@@ -111,12 +111,13 @@ def process_file(file, filename: str, flag: str):
                     row[1] = a
                     year = a
                 if flag == "pdf":
-                    handle_municipalities(row)
+                    handle_municipalities(row, flag)
                 else:
                     row.pop(0)  # remove empty first col, 'a' in excel
                     row = row[
                         :19
                     ]  # remove any cols beyond the last, as there are some empties
+                    handle_municipalities(row, flag)
                 if row[0] == 0:
                     pass
                 else:
@@ -138,10 +139,6 @@ def split_line(line: str, flag: str) -> list:
     def contains_keyword(lst, keyword: str):
         """
         Checks if any item in the list contains the specified keyword.
-
-        :param lst: The list to be checked.
-        :param keyword: The keyword to check for within the list items.
-        :return: True if the keyword is found in any item, False otherwise.
         """
         return any(keyword in item for item in lst)
 
@@ -151,7 +148,7 @@ def split_line(line: str, flag: str) -> list:
         if line.startswith(" ") and r:
             r.insert(0, "")
     elif flag == "xlsx":
-        pattern = r","
+        pattern = r"\|"
         r = re.split(pattern, line.strip())
 
     if contains_keyword(r, "LOCATION FROM"):
@@ -184,26 +181,32 @@ def current_year(r: list):
         return r[1]
 
 
-def handle_municipalities(row: list):
+def handle_municipalities(row: list, flag: str):
     """Fills in blank strings to ensure all rows are same length"""
-
-    # Insert blanks for philly or places w/ only one/two munis
-    if row[-2] == "PHILADELPHIA":
-        row.insert(-1, "")
-        row.insert(-1, "")
-    # Rows where two munis are filled in
-    elif len(row) == 12:
-        row.insert(-1, "")
-    # Rows where one muni is filled in
-    elif len(row) == 11:
-        row.insert(-1, "")
-        row.insert(-1, "")
-    # Rows with all three munis (do nothing)
-    elif len(row) == 13:
-        pass
-    else:
-        print(row, len(row))
-        raise Exception("Unhandled row length")
+    if flag == "pdf":
+        # Insert blanks for philly or places w/ only one/two munis
+        if row[-2] == "PHILADELPHIA":
+            row.insert(-1, "")
+            row.insert(-1, "")
+        # Rows where two munis are filled in
+        elif len(row) == 12:
+            row.insert(-1, "")
+        # Rows where one muni is filled in
+        elif len(row) == 11:
+            row.insert(-1, "")
+            row.insert(-1, "")
+        # Rows with all three munis (do nothing)
+        elif len(row) == 13:
+            pass
+        else:
+            print(row, len(row))
+            raise Exception("Unhandled row length")
+    elif flag == "xlsx":
+        if row[-8] == "PHILADELPHIA":
+            row.insert(-7, "")
+            row.insert(-7, "")
+        else:
+            pass
 
 
 def create_pg_table(tablename):
