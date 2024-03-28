@@ -1,47 +1,41 @@
 from env_vars import ENGINE
 from sqlalchemy import text
 
-EDIT_PG_COLUMN_TYPE = """
+EDIT_COLUMNS = """
     ALTER TABLE "DistrictPlan"
     ADD COLUMN IF NOT EXISTS longcode VARCHAR;
 
     ALTER TABLE "DistrictPlan"
     ADD COLUMN IF NOT EXISTS shortcode VARCHAR;
+
+    COMMIT;
 """
 
-UPDATE_PG_CODES = """
+UPDATE_STATEMENTS = """
     
     UPDATE "DistrictPlan"
     SET shortcode = CONCAT(
-        tochar(cast("State Route" AS numeric),'fm0000')
-        tochar(cast("Segment From" AS numeric), 'fm0000')
-        to_char(CAST("Segment To" AS numeric), 'fm0000')
+        to_char(cast("State Route" AS NUMERIC),'fm0000'),
+        to_char(cast("Segment From" AS NUMERIC), 'fm0000'),
+        to_char(cast("Segment To" AS NUMERIC), 'fm0000')
     );
-
 
     UPDATE "DistrictPlan"
     SET longcode = CONCAT(
-        tochar(cast("State Route" AS numeric),'fm0000')
-        tochar(cast("Segment From" AS numeric), 'fm0000')
-        "tochar(cast(Offset From" AS numeric, 'fm0000')
-        to_char(CAST("Segment To" AS numeric), 'fm0000') 
-        to_char(CAST("Offset to" AS numeric), 'fm0000')
+        to_char(cast("State Route" AS NUMERIC),'fm0000'),
+        to_char(cast("Segment From" AS NUMERIC), 'fm0000'),
+        to_char(cast("Offset From" AS NUMERIC), 'fm0000'),
+        to_char(CAST("Segment To" AS NUMERIC), 'fm0000'),
+        to_char(CAST("Offset to" AS NUMERIC), 'fm0000')
     );
-"""
 
-# Constants for SQL queries
-EDIT_ORACLE_COLUMN_TYPE = """
-    ALTER TABLE oracle_copy
-    ALTER COLUMN "shortcode" TYPE VARCHAR;
-"""
-
-UPDATE_ORACLE_CODES = """
     UPDATE oracle_copy
     SET "shortcode" = CONCAT(
         TO_CHAR(CAST("state_route" AS NUMERIC), 'fm0000'),
         TO_CHAR(CAST("segment_from" AS NUMERIC), 'fm0000'),
         TO_CHAR(CAST("segment_to" AS NUMERIC), 'fm0000')
     );
+
     UPDATE oracle_copy
     SET "longcode" = CONCAT(
         TO_CHAR(CAST("state_route" AS NUMERIC), 'fm0000'),
@@ -50,29 +44,25 @@ UPDATE_ORACLE_CODES = """
         TO_CHAR(CAST("segment_to" AS NUMERIC), 'fm0000'),
         TO_CHAR(CAST("offset_to" AS NUMERIC), 'fm0000')
     );
+
     COMMIT;
 """
-def edit_pg_codes():
 
-def edit_oracle_codes():
+
+def update_columns():
     """
-    Edits and updates Oracle codes in the database.
+    update all short and log codes
     """
     try:
         con = ENGINE.connect()
-        con.execute(text(EDIT_ORACLE_COLUMN_TYPE))
-        con.execute(text(UPDATE_ORACLE_CODES))
+        print(EDIT_COLUMNS)
+        con.execute(text(EDIT_COLUMNS))
+        con.execute(text(UPDATE_STATEMENTS))
     except Exception as e:
-        # Handle any exceptions that occur
         print(f"An error occurred: {e}")
     finally:
-        # Ensure that the connection is closed
         con.close()
 
 
-def main():
-    """
-    Main function to run the desired processes.
-    """
-    edit_oracle_codes()
-    # Consider adding other function calls or logic here
+if __name__ == "__main__":
+    update_columns()
