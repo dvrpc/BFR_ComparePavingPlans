@@ -2,7 +2,7 @@ from dotenv import dotenv_values
 from sqlalchemy import create_engine
 
 config = dotenv_values(".env")
-# DATA_ROOT = os.getenv("data_root")
+DATA_ROOT = config["DATA_ROOT"]
 
 # postgresql
 POSTGRES_URL = config["PG_URL"]
