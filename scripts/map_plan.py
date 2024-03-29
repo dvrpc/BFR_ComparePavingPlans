@@ -6,67 +6,30 @@ repaving plan for each county in District 6.
 
 """
 
-import geopandas as gpd
-import pandas as pd
-from geoalchemy2 import WKTElement
-from sqlalchemy import engine
 import env_vars as ev
-from env_vars import ENGINE
+from env_vars import POSTGRES_URL
+import requests
+import os
 
 
 def read_in_penndot_rms():
-    print("Gathering PennDOT data")
-    # import PennDOT's rms layer from GIS portal - RMSSEG (State Roads)
-    gdf = gpd.read_file(
-        "https://opendata.arcgis.com/datasets/d9a2a5df74cf4726980e5e276d51fe8d_0.geojson"
-    )
+    print("Gathering PennDOT data from PennDOT rest service...")
+    url = "https://gis.penndot.pa.gov/gis/rest/services/opendata/roadwaysegments/MapServer/3/query?where=DISTRICT_NO%20%3D%20'06'&outFields=*&outSR=4326&f=geojson"
+    r = requests.get(url)
+    if r.status_code != 200:
+        raise Exception(
+            "Check the PennDOT RMS URL, might be broken. Non-200 status code."
+        )
 
-    # remove null geometries
-    gdf = gdf[gdf.geometry.notnull()]
-    # remove records outside of district 6
-    gdf = gdf.loc[gdf["DISTRICT_NO"] == "06"]
+    print("importing PennDOT RMS data into Postgres")
 
-    # transform projection from 4326 to 26918
-    gdf = gdf.to_crs(epsg=26918)
-
-    # create geom column for postgis import
-    gdf["geom"] = gdf["geometry"].apply(lambda x: WKTElement(x.wkt, srid=26918))
-
-    # write geodataframe to postgis
-    gdf.to_postgis("penndot_rms", con=ENGINE, if_exists="replace")
-
-
-def add_county_code(county):
-    print("Adding county codes")
-    county_lookup = {
-        "Bucks": "09",
-        "Chester": "15",
-        "Delaware": "23",
-        "Montgomery": "46",
-        "Philadelphia": "67",
-    }
-    code = county_lookup[county]
-
-    sql1 = fr"""
-    ALTER TABLE "{county}_County_Plan"    
-    ADD COLUMN IF NOT EXISTS cty_code VARCHAR;
-    COMMIT;
-    """
-
-    sql2 = fr"""
-    UPDATE "{county}_County_Plan"
-    SET cty_code = {code};
-    COMMIT;
-    """
-    con = ENGINE.connect()
-    con.execute(sql1)
-    con.execute(sql2)
+    os.system(f'ogr2ogr -f "PostgreSQL" "{POSTGRES_URL}" "{url}" -nln rms -overwrite')
 
 
 def map_each_county(county):
-    print(fr"Mapping {county}")
+    print(rf"Mapping {county}")
     gdf = gpd.GeoDataFrame.from_postgis(
-        fr"""
+        rf"""
         WITH tblA AS(
         SELECT 
             "Year",
@@ -117,9 +80,9 @@ def map_each_county(county):
 
 def map_phila():
     county = "Philadelphia"
-    print(fr"Mapping {county}")
+    print(rf"Mapping {county}")
     gdf = gpd.GeoDataFrame.from_postgis(
-        fr"""
+        rf"""
         WITH tblA AS(
         SELECT 
             "Year",
@@ -186,37 +149,41 @@ def write_postgis(gdf):
     gdf.to_postgis("mapped_plan", con=ENGINE, if_exists="replace")
     print("To database: Complete")
 
+
 def concat_munis():
     gdf = gpd.GeoDataFrame.from_postgis(
-        fr"""
+        rf"""
         SELECT *,
         ("Municipality1"|| coalesce (', ' || "Municipality2", '') || coalesce (', ' || "Municipality3", '')) as muni
         FROM mapped_plan
         """,
         con=ENGINE,
-        geom_col="geometry")
+        geom_col="geometry",
+    )
 
-    return(gdf)
+    return gdf
+
 
 def write_all_outputs(gdf):
     # output spatial file (postgis, shp, and geojson)
     gdf.to_postgis("mapped_plan", con=ENGINE, if_exists="replace")
     print("To database: Complete")
-    gdf.to_file(fr"{ev.DATA_ROOT}/shapefiles/mapped_plan.shp")
+    gdf.to_file(rf"{ev.DATA_ROOT}/shapefiles/mapped_plan.shp")
     print("To shapefile: Complete")
     gdf.to_file(
-        fr"{ev.DATA_ROOT}/geojsons/mapped_plan.geojson",
+        rf"{ev.DATA_ROOT}/geojsons/mapped_plan.geojson",
         driver="GeoJSON",
     )
     print("To GeoJSON: Complete")
 
+
 def main():
     read_in_penndot_rms()
-    counties = ["Bucks", "Chester", "Delaware", "Montgomery", "Philadelphia"]
-    for county in counties:
-        add_county_code(county)
-    write_postgis(combine_counties())
-    write_all_outputs(concat_munis())
+    # counties = ["Bucks", "Chester", "Delaware", "Montgomery", "Philadelphia"]
+    # for county in counties:
+    #     add_county_code(county)
+    # write_postgis(combine_counties())
+    # write_all_outputs(concat_munis())
 
 
 if __name__ == "__main__":
