@@ -105,6 +105,7 @@ def create_csvs(views, database_uri):
                 "Segment To",
                 "Offset From",
                 "Offset to",
+                "cty_code",
             ]
 
             with open(file_path, "w", newline="") as csvfile:
