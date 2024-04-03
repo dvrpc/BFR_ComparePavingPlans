@@ -1,6 +1,8 @@
-from env_vars import ENGINE
+from env_vars import ENGINE, POSTGRES_URL
 from sqlalchemy import text
 import os
+import psycopg2
+import csv
 
 last_plan = "5-year plan 2022-2026"
 current_plan = "5-year plan 2024-2028"
@@ -83,29 +85,46 @@ def update_columns():
         con.close()
 
 
-def create_csvs():
-    """Export views to csv
-    Important: user must have access to the folder.
-    In linux, try chmod 777 ./data/to_change
-    because postgres user (or whatever user in your .env)
-    needs write access to dump out these csvs.
-    """
-
+def create_csvs(views, database_uri):
     directory = os.getcwd() + "/data/to_change"
     print(os.getcwd())
 
-    for view in views:
-        command = f"COPY (select * from {view}) TO '{directory}/{view}.csv' DELIMITER ',' CSV HEADER;"
-        try:
-            con = ENGINE.connect()
-            print(command)
-            con.execute(text(command))
-        except Exception as e:
-            print(f"An error occurred: {e}")
-        finally:
-            con.close()
+    with psycopg2.connect(database_uri) as conn:
+        cursor = conn.cursor()
+
+        for view in views:
+            file_path = f"{directory}/{view}.csv"
+            print(f"Exporting {view} to {file_path}")
+
+            cursor.execute(f"SELECT * FROM {view}")
+            columns = [desc[0] for desc in cursor.description]
+
+            text_columns = [
+                "State Route",
+                "Segment From",
+                "Segment To",
+                "Offset From",
+                "Offset to",
+            ]
+
+            with open(file_path, "w", newline="") as csvfile:
+                csvwriter = csv.writer(
+                    csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL
+                )
+                csvwriter.writerow(columns)
+
+                for row in cursor:
+                    formatted_row = [
+                        f'"{value}"'
+                        if columns[i] in text_columns and isinstance(value, str)
+                        else value
+                        for i, value in enumerate(row)
+                    ]
+                    csvwriter.writerow(formatted_row)
+
+            print(f"{view} exported successfully.")
 
 
 if __name__ == "__main__":
     update_columns()
-    create_csvs()
+    create_csvs(views, POSTGRES_URL)
