@@ -73,7 +73,7 @@ def export_geoms():
 
 
 def main():
-    # read_in_penndot_rms()
+    read_in_penndot_rms()
     export_geoms()
 
 
