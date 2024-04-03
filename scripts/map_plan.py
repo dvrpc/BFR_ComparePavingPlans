@@ -46,6 +46,7 @@ def export_geoms():
       "Municipality Name1",
       "Miles Planned",
       "County",
+      r.cty_code,
       r.seg_no,
       r.wkb_geometry as geom
     FROM "DistrictPlan" a

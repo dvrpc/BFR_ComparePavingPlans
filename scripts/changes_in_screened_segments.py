@@ -12,6 +12,10 @@ views = [
     "year_length_change",
 ]
 
+district_update = """
+    update district_plan
+"""
+
 VIEWS = f"""
 -- new segments
 create or replace view {views[0]} as

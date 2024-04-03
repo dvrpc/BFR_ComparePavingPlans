@@ -8,6 +8,10 @@ EDIT_COLUMNS = """
     ALTER TABLE "DistrictPlan"
     ADD COLUMN IF NOT EXISTS shortcode VARCHAR;
 
+
+    ALTER TABLE "DistrictPlan"
+    ADD COLUMN IF NOT EXISTS cty_code VARCHAR;
+
     COMMIT;
 """
 
@@ -29,6 +33,16 @@ UPDATE_STATEMENTS = """
         to_char(CAST("Offset to" AS NUMERIC), 'fm0000')
     );
 
+    UPDATE "DistrictPlan"
+    SET cty_code =  CASE
+          WHEN "County" = 'Philadelphia' THEN '67'
+          WHEN "County" = 'Bucks' THEN '09'
+          WHEN "County" = 'Delaware' THEN '23'
+          WHEN "County" = 'Chester' THEN '15'
+          WHEN "County" = 'Montgomery' THEN '46'
+          ELSE $$00$$
+        END;
+
     UPDATE oracle_copy
     SET "shortcode" = CONCAT(
         TO_CHAR(CAST("state_route" AS NUMERIC), 'fm0000'),
@@ -45,6 +59,8 @@ UPDATE_STATEMENTS = """
         TO_CHAR(CAST("offset_to" AS NUMERIC), 'fm0000')
     );
 
+    
+
     COMMIT;
 """
 
@@ -55,7 +71,6 @@ def update_columns():
     """
     try:
         con = ENGINE.connect()
-        print(EDIT_COLUMNS)
         con.execute(text(EDIT_COLUMNS))
         con.execute(text(UPDATE_STATEMENTS))
     except Exception as e:
