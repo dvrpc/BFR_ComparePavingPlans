@@ -43,6 +43,15 @@ UPDATE_STATEMENTS = """
           ELSE $$00$$
         END;
 
+    UPDATE "DistrictPlan"
+    SET 
+        "State Route" = to_char(cast("State Route" AS NUMERIC), 'fm0000'),
+        "Segment From" = to_char(cast("Segment From" AS NUMERIC), 'fm0000'),
+        "Segment To" = to_char(cast("Segment To" AS NUMERIC), 'fm0000'),
+        "Offset From" = to_char(cast("Offset From" AS NUMERIC), 'fm0000'),
+        "Offset to" = to_char(cast("Offset to" AS NUMERIC), 'fm0000');
+    ;
+
     UPDATE oracle_copy
     SET "shortcode" = CONCAT(
         TO_CHAR(CAST("state_route" AS NUMERIC), 'fm0000'),
